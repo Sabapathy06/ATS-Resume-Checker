@@ -6,16 +6,18 @@ interface AuthContextValue {
   session: import('@supabase/supabase-js').Session | null;
   loading: boolean;
   signInAsDemo: (name?: string, email?: string) => void;
+  signInLocally: (email: string, name?: string, provider?: string) => void;
   signOut: () => Promise<void>;
 }
 
-const DEMO_USER_STORAGE_KEY = 'ats_demo_user_session';
+const LOCAL_USER_STORAGE_KEY = 'ats_demo_user_session';
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   session: null,
   loading: true,
   signInAsDemo: () => {},
+  signInLocally: () => {},
   signOut: async () => {},
 });
 
@@ -24,36 +26,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthContextValue['session']>(null);
   const [loading, setLoading] = useState(true);
 
-  const signInAsDemo = (name = 'Demo Candidate', email = 'demo@atsresume.app') => {
-    const demoUser = {
-      id: 'demo-user-123',
+  const signInLocally = (email: string, name?: string, provider = 'email') => {
+    const localUser = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       email,
-      user_metadata: { full_name: name },
-      app_metadata: {},
+      user_metadata: { full_name: name || email.split('@')[0], provider },
+      app_metadata: { provider },
       aud: 'authenticated',
       created_at: new Date().toISOString(),
     } as unknown as import('@supabase/supabase-js').Session['user'];
 
-    const demoSession = {
-      access_token: 'demo-token-123',
-      refresh_token: 'demo-refresh',
+    const localSession = {
+      access_token: `demo-token-${Date.now()}`,
+      refresh_token: 'local-refresh-token',
       expires_in: 86400,
       token_type: 'bearer',
-      user: demoUser,
+      user: localUser,
     } as unknown as import('@supabase/supabase-js').Session;
 
     try {
-      localStorage.setItem(DEMO_USER_STORAGE_KEY, JSON.stringify(demoSession));
+      localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(localSession));
     } catch {}
 
-    setUser(demoUser);
-    setSession(demoSession);
+    setUser(localUser);
+    setSession(localSession);
     setLoading(false);
+  };
+
+  const signInAsDemo = (name = 'Demo Candidate', email = 'demo@atsresume.app') => {
+    signInLocally(email, name, 'demo');
   };
 
   const signOut = async () => {
     try {
-      localStorage.removeItem(DEMO_USER_STORAGE_KEY);
+      localStorage.removeItem(LOCAL_USER_STORAGE_KEY);
     } catch {}
     try {
       await supabase.auth.signOut();
@@ -63,9 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Check local demo session first
+    // 1. Check local session first
     try {
-      const stored = localStorage.getItem(DEMO_USER_STORAGE_KEY);
+      const stored = localStorage.getItem(LOCAL_USER_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.user) {
@@ -77,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    // Otherwise check Supabase session
+    // 2. Check Supabase session
     supabase.auth
       .getSession()
       .then(({ data }) => {
@@ -103,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInAsDemo, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signInAsDemo, signInLocally, signOut }}>
       {children}
     </AuthContext.Provider>
   );
