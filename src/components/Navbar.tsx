@@ -80,10 +80,21 @@ export default function Navbar() {
 
             <div className="hidden items-center gap-3 md:flex">
               <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-electric-400 to-iris-500 text-[11px] font-bold text-white">
-                  {(user.email ?? 'U').charAt(0).toUpperCase()}
+                {user.user_metadata?.avatar_url ? (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt=""
+                    className="h-6 w-6 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-electric-400 to-iris-500 text-[11px] font-bold text-white">
+                    {(user.email ?? 'U').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="max-w-[140px] truncate text-xs text-slate-400">
+                  {user.user_metadata?.full_name || user.email}
                 </span>
-                <span className="max-w-[140px] truncate text-xs text-slate-400">{user.email}</span>
               </div>
               <button
                 onClick={handleSignOut}

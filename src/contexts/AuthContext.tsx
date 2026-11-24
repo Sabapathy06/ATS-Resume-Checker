@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import supabase from '../lib/supabase';
+import type { GoogleUserProfile } from '../lib/googleAuth';
 
 interface AuthContextValue {
   user: import('@supabase/supabase-js').Session['user'] | null;
@@ -7,6 +8,7 @@ interface AuthContextValue {
   loading: boolean;
   signInAsDemo: (name?: string, email?: string) => void;
   signInLocally: (email: string, name?: string, provider?: string) => void;
+  signInWithGoogleProfile: (profile: GoogleUserProfile) => void;
   signOut: () => Promise<void>;
 }
 
@@ -18,6 +20,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   signInAsDemo: () => {},
   signInLocally: () => {},
+  signInWithGoogleProfile: () => {},
   signOut: async () => {},
 });
 
@@ -25,6 +28,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthContextValue['user']>(null);
   const [session, setSession] = useState<AuthContextValue['session']>(null);
   const [loading, setLoading] = useState(true);
+
+  const signInWithGoogleProfile = (profile: GoogleUserProfile) => {
+    const googleUser = {
+      id: profile.id,
+      email: profile.email,
+      user_metadata: {
+        full_name: profile.name,
+        avatar_url: profile.picture,
+        provider: 'google',
+      },
+      app_metadata: { provider: 'google' },
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as unknown as import('@supabase/supabase-js').Session['user'];
+
+    const googleSession = {
+      access_token: profile.token,
+      refresh_token: 'google-oauth-token',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: googleUser,
+    } as unknown as import('@supabase/supabase-js').Session;
+
+    try {
+      localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(googleSession));
+    } catch {}
+
+    setUser(googleUser);
+    setSession(googleSession);
+    setLoading(false);
+  };
 
   const signInLocally = (email: string, name?: string, provider = 'email') => {
     const localUser = {
@@ -109,7 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInAsDemo, signInLocally, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signInAsDemo, signInLocally, signInWithGoogleProfile, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

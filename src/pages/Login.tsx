@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, ArrowRight, Loader2, ShieldCheck, BarChart3, FileSearch, AlertCircle, PlayCircle } from 'lucide-react';
 import supabase from '../lib/supabase';
-import { signInWithGoogle } from '../lib/googleAuth';
+import { requestGoogleSignIn } from '../lib/googleAuth';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
@@ -17,7 +17,7 @@ export default function Login() {
   const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signInAsDemo, signInLocally } = useAuth();
+  const { user, signInAsDemo, signInLocally, signInWithGoogleProfile } = useAuth();
 
   const from = (location.state as { from?: string } | null)?.from || '/analyzer';
 
@@ -97,12 +97,14 @@ export default function Login() {
     setGoogleBusy(true);
     setError(null);
     try {
-      await signInWithGoogle((fallbackUser) => {
-        signInLocally(fallbackUser.email, fallbackUser.name, 'google');
-        navigate(from, { replace: true });
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google sign-in could not be started.');
+      const googleProfile = await requestGoogleSignIn();
+      signInWithGoogleProfile(googleProfile);
+      navigate(from, { replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google sign-in could not be started.';
+      if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('closed')) {
+        setError(msg);
+      }
     } finally {
       setGoogleBusy(false);
     }

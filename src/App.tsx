@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider } from './contexts/AuthContext';
-import { handleGoogleRedirect } from './lib/googleAuth';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -14,8 +13,6 @@ import Recommendations from './pages/Recommendations';
 import Builder from './pages/Builder';
 import Dashboard from './pages/Dashboard';
 import Compare from './pages/Compare';
-
-handleGoogleRedirect();
 
 function ScrollToTop() {
   const { pathname } = useLocation();
