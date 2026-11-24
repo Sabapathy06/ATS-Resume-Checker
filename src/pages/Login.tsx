@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, Loader2, ShieldCheck, BarChart3, FileSearch, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, ShieldCheck, BarChart3, FileSearch, AlertCircle, PlayCircle } from 'lucide-react';
 import supabase from '../lib/supabase';
 import { signInWithGoogle } from '../lib/googleAuth';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +16,7 @@ export default function Login() {
   const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signInAsDemo } = useAuth();
 
   const from = (location.state as { from?: string } | null)?.from || '/analyzer';
 
@@ -40,6 +40,14 @@ export default function Login() {
       setError(v);
       return;
     }
+
+    // If using the demo credentials, log in instantly
+    if (email.trim().toLowerCase() === 'demo@atsresume.app') {
+      signInAsDemo('Demo Candidate', 'demo@atsresume.app');
+      navigate(from, { replace: true });
+      return;
+    }
+
     setError(null);
     setBusy(true);
     try {
@@ -50,7 +58,7 @@ export default function Login() {
           options: { data: { full_name: fullName.trim() } },
         });
         if (err) throw err;
-        setNotice('Account created. You can now sign in with your credentials.');
+        setNotice('Account created! You can now sign in with your credentials.');
         setIsSignUp(false);
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -64,11 +72,9 @@ export default function Login() {
     }
   };
 
-  const fillDemo = () => {
-    setEmail('demo@atsresume.app');
-    setPassword('password123');
-    setIsSignUp(false);
-    setError(null);
+  const handleDemoLogin = () => {
+    signInAsDemo('Demo Candidate', 'demo@atsresume.app');
+    navigate(from, { replace: true });
   };
 
   return (
@@ -88,8 +94,7 @@ export default function Login() {
             <span className="gradient-text">ATS command centre</span>
           </h1>
           <p className="mt-5 max-w-md text-slate-400">
-            Sign in to pick up your analysis history, compare resume versions and keep improving your
-            score.
+            Sign in to pick up your analysis history, compare resume versions and keep improving your score.
           </p>
 
           <div className="mt-10 space-y-4">
@@ -98,13 +103,13 @@ export default function Login() {
               { icon: BarChart3, title: 'Side-by-side comparison', desc: 'Track how each revision scores.' },
               { icon: ShieldCheck, title: 'Private by default', desc: 'Your resumes are only visible to your account.' },
             ].map((f) => (
-              <div key={f.title} className="glass flex items-start gap-4 rounded-2xl p-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-electric-500/20 to-iris-600/20 text-iris-300">
-                  <f.icon className="h-5 w-5" />
+              <div key={f.title} className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-iris-400/20 bg-iris-500/10 text-iris-300">
+                  <f.icon className="h-4 w-4" />
                 </span>
                 <div>
                   <p className="text-sm font-semibold text-white">{f.title}</p>
-                  <p className="mt-0.5 text-[13px] text-slate-500">{f.desc}</p>
+                  <p className="text-xs text-slate-400">{f.desc}</p>
                 </div>
               </div>
             ))}
@@ -117,14 +122,16 @@ export default function Login() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="glass-strong mx-auto w-full max-w-md rounded-3xl p-7 sm:p-9"
         >
-          <h2 className="font-display text-2xl font-bold text-white">
-            {isSignUp ? 'Create your account' : 'Sign in'}
-          </h2>
-          <p className="mt-1.5 text-sm text-slate-500">
-            {isSignUp ? 'Start scoring your resumes in minutes.' : 'Continue improving your ATS score.'}
-          </p>
+          <div className="mb-6">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-white">
+              {isSignUp ? 'Create your account' : 'Sign in'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {isSignUp ? 'Start analyzing resumes with free scoring' : 'Access your saved reports and tools'}
+            </p>
+          </div>
 
-          <form onSubmit={handleEmailAuth} className="mt-7 space-y-4">
+          <form onSubmit={handleEmailAuth} className="space-y-4">
             {isSignUp && (
               <div>
                 <label htmlFor="name" className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -201,28 +208,31 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="my-6 flex items-center gap-3">
+          <div className="my-5 flex items-center gap-3">
             <span className="h-px flex-1 bg-white/10" />
-            <span className="text-xs text-slate-600">or</span>
+            <span className="text-xs text-slate-500">or continue with</span>
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          <button onClick={() => signInWithGoogle('ATS Resume Analyzer')} className="btn-ghost w-full">
-            <svg viewBox="0 0 24 24" className="h-4 w-4">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-            </svg>
-            Continue with Google
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleDemoLogin}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-iris-500/40 bg-iris-500/15 px-4 py-2.5 text-sm font-semibold text-iris-200 transition-colors hover:bg-iris-500/25 hover:text-white"
+            >
+              <PlayCircle className="h-4 w-4 text-iris-300" />
+              Try Demo Account (Instant Access)
+            </button>
 
-          <button
-            onClick={fillDemo}
-            className="mt-4 w-full rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-2.5 text-xs text-slate-400 transition-colors hover:border-iris-400/40 hover:text-iris-200"
-          >
-            Use demo account — demo@atsresume.app / password123
-          </button>
+            <button onClick={() => signInWithGoogle('ATS Resume Analyzer')} className="btn-ghost w-full">
+              <svg viewBox="0 0 24 24" className="h-4 w-4">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              Continue with Google
+            </button>
+          </div>
 
           <p className="mt-6 text-center text-sm text-slate-500">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}

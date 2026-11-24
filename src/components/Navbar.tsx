@@ -25,7 +25,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
 }
 
 export default function Navbar() {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
@@ -44,8 +44,8 @@ export default function Navbar() {
     return () => window.removeEventListener('resize', close);
   }, [open]);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const handleSignOut = async () => {
+    await signOut();
     navigate('/');
   };
 
@@ -86,7 +86,7 @@ export default function Navbar() {
                 <span className="max-w-[140px] truncate text-xs text-slate-400">{user.email}</span>
               </div>
               <button
-                onClick={signOut}
+                onClick={handleSignOut}
                 className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
               >
                 <LogOut className="h-4 w-4" />
@@ -134,7 +134,7 @@ export default function Navbar() {
                   {l.label}
                 </NavLink>
               ))}
-              <button onClick={signOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+              <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
                 <LogOut className="h-4 w-4" />
                 Sign out
               </button>

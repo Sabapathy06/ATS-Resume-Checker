@@ -34,31 +34,43 @@ export default async function handler(req, res) {
     }
 
     const title = fileName || `${result.meta.roleLabel} resume`;
-    const client = scopedClient(auth.token);
+    let dbRecord = null;
 
-    const { data, error } = await client
-      .from('analyses')
-      .insert({
-        user_id: auth.user.id,
-        title,
-        file_name: fileName || null,
-        file_type: fileType || null,
-        target_role: result.meta.targetRole,
-        role_label: result.meta.roleLabel,
-        resume_text: resumeText,
-        job_description: jobDescription || null,
-        overall_score: result.overallScore,
-        rating: result.rating,
-        word_count: result.stats.wordCount,
-        has_jd: !!jobDescription && jobDescription.trim().length > 60,
-        result,
-      })
-      .select('id, created_at, title, overall_score, rating, target_role, role_label')
-      .single();
+    if (auth.token && !auth.token.startsWith('demo-token')) {
+      try {
+        const client = scopedClient(auth.token);
+        const { data, error } = await client
+          .from('analyses')
+          .insert({
+            user_id: auth.user.id,
+            title,
+            file_name: fileName || null,
+            file_type: fileType || null,
+            target_role: result.meta.targetRole,
+            role_label: result.meta.roleLabel,
+            resume_text: resumeText,
+            job_description: jobDescription || null,
+            overall_score: result.overallScore,
+            rating: result.rating,
+            word_count: result.stats.wordCount,
+            has_jd: !!jobDescription && jobDescription.trim().length > 60,
+            result,
+          })
+          .select('id, created_at, title, overall_score, rating, target_role, role_label')
+          .single();
 
-    if (error) throw error;
+        if (!error && data) {
+          dbRecord = data;
+        }
+      } catch (dbErr) {
+        console.warn('Database save skipped:', dbErr.message);
+      }
+    }
 
-    return res.status(201).json({ id: data.id, createdAt: data.created_at, result });
+    const id = dbRecord?.id || `demo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = dbRecord?.created_at || new Date().toISOString();
+
+    return res.status(201).json({ id, createdAt, result });
   } catch (err) {
     console.error('analyze API error:', err);
     return res.status(500).json({ error: err.message || 'Analysis failed. Please try again.' });
