@@ -19,10 +19,26 @@ export default async function handler(req, res) {
     career_level: 'fresher',
   };
 
-  if (auth.token && auth.token.startsWith('demo-token')) {
+  const isDemoOrPlaceholder =
+    (auth.token && auth.token.startsWith('demo-token')) ||
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+
+  if (isDemoOrPlaceholder) {
     if (req.method === 'GET') return res.status(200).json(defaultProfile);
     if (req.method === 'PUT' || req.method === 'POST') {
-      return res.status(200).json({ ...defaultProfile, ...(req.body || {}) });
+      const b = req.body || {};
+      const merged = {
+        user_id: auth.user.id,
+        full_name: b.full_name || b.fullName || defaultProfile.full_name,
+        email: b.email || defaultProfile.email,
+        phone: b.phone || '',
+        location: b.location || '',
+        linkedin: b.linkedin || '',
+        target_role: b.target_role || b.targetRole || defaultProfile.target_role,
+        career_level: b.career_level || b.careerLevel || defaultProfile.career_level,
+      };
+      return res.status(200).json(merged);
     }
   }
 
@@ -46,13 +62,13 @@ export default async function handler(req, res) {
       const b = req.body || {};
       const payload = {
         user_id: auth.user.id,
-        full_name: (b.fullName || defaultProfile.full_name).slice(0, 120),
+        full_name: (b.full_name || b.fullName || defaultProfile.full_name || '').slice(0, 120),
         email: (b.email || auth.user.email || '').slice(0, 160),
         phone: (b.phone || '').slice(0, 40),
         location: (b.location || '').slice(0, 120),
         linkedin: (b.linkedin || '').slice(0, 200),
-        target_role: b.targetRole || 'generic',
-        career_level: b.careerLevel || 'fresher',
+        target_role: b.target_role || b.targetRole || 'generic',
+        career_level: b.career_level || b.careerLevel || 'fresher',
       };
       try {
         const { data, error } = await client

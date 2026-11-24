@@ -27,10 +27,21 @@ export default function Dashboard() {
     Promise.all([api.listAnalyses(), api.getProfile()])
       .then(([list, p]) => {
         setItems(list);
+        const resolvedEmail = user?.email || p.email;
+        let resolvedName = p.full_name;
+        if (!resolvedName || resolvedName.includes('Demo Candidate')) {
+          if (user?.user_metadata?.full_name && !user.user_metadata.full_name.includes('Demo Candidate')) {
+            resolvedName = user.user_metadata.full_name;
+          } else if (resolvedEmail && !resolvedEmail.includes('demo@')) {
+            resolvedName = resolvedEmail.split('@')[0];
+          } else {
+            resolvedName = 'Candidate';
+          }
+        }
         const resolvedProfile: Profile = {
           ...p,
-          email: user?.email || p.email,
-          full_name: (p.full_name && !p.full_name.includes('Demo Candidate')) ? p.full_name : (user?.user_metadata?.full_name || user?.email?.split('@')[0] || p.full_name),
+          email: resolvedEmail,
+          full_name: resolvedName,
         };
         setProfile(resolvedProfile);
       })
@@ -68,6 +79,24 @@ export default function Dashboard() {
     try {
       const saved = await api.saveProfile(profile);
       setProfile(saved);
+      if (saved.full_name) {
+        if (user) {
+          user.user_metadata = { ...user.user_metadata, full_name: saved.full_name };
+        }
+        try {
+          const raw = localStorage.getItem('ats_demo_user_session');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.user) {
+              parsed.user.user_metadata = {
+                ...parsed.user.user_metadata,
+                full_name: saved.full_name,
+              };
+              localStorage.setItem('ats_demo_user_session', JSON.stringify(parsed));
+            }
+          }
+        } catch {}
+      }
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
     } catch (e) {
@@ -97,7 +126,7 @@ export default function Dashboard() {
           <div>
             <span className="chip border-iris-400/25 bg-iris-500/10 text-iris-200"><BarChart3 className="h-3 w-3" /> Dashboard</span>
             <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
+              Welcome back{profile?.full_name && !profile.full_name.includes('Demo Candidate') ? `, ${profile.full_name.split(' ')[0]}` : user?.user_metadata?.full_name && !user.user_metadata.full_name.includes('Demo Candidate') ? `, ${user.user_metadata.full_name.split(' ')[0]}` : user?.email && !user.email.includes('demo@') ? `, ${user.email.split('@')[0]}` : ''}
             </h1>
             <p className="mt-2 text-sm text-slate-400">{user?.email}</p>
           </div>

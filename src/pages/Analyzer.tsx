@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -25,6 +25,14 @@ export default function Analyzer() {
   const [manualText, setManualText] = useState('');
   const [targetRole, setTargetRole] = useState('software_engineer');
   const [jobDescription, setJobDescription] = useState('');
+
+  useEffect(() => {
+    api.getProfile().then((p) => {
+      if (p?.target_role && p.target_role !== 'generic') {
+        setTargetRole(p.target_role);
+      }
+    }).catch(() => {});
+  }, []);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [stage, setStage] = useState(0);

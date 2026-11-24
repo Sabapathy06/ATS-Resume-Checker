@@ -58,6 +58,41 @@ function saveCachedAnalysis(rec: AnalysisRecord) {
   } catch {}
 }
 
+function getCurrentUserInfo(): { email: string; name: string } {
+  try {
+    const raw = localStorage.getItem(DEMO_SESSION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.user) {
+        const email = parsed.user.email || '';
+        const userEmail = email.toLowerCase().trim();
+        let name = parsed.user.user_metadata?.full_name || '';
+        if (userEmail) {
+          try {
+            const saved = localStorage.getItem(`ats_profile_${userEmail}`);
+            if (saved) {
+              const prof = JSON.parse(saved);
+              if (prof?.full_name && !prof.full_name.includes('Demo Candidate')) {
+                name = prof.full_name;
+              }
+            }
+          } catch {}
+        }
+        if (!name || name.includes('Demo Candidate')) {
+          if (email && !email.includes('demo@')) {
+            name = email.split('@')[0];
+          }
+        }
+        return {
+          email,
+          name: name || 'Candidate',
+        };
+      }
+    }
+  } catch {}
+  return { email: '', name: '' };
+}
+
 export const api = {
   analyze: async (body: {
     resumeText: string;
@@ -164,23 +199,35 @@ export const api = {
   },
 
   getProfile: async (): Promise<Profile> => {
-    let currentEmail = '';
-    let currentName = '';
+    const current = getCurrentUserInfo();
+    const email = current.email.toLowerCase().trim();
+
+    // 1. Check user-specific storage key first
+    if (email) {
+      try {
+        const stored = localStorage.getItem(`ats_profile_${email}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.email) return parsed;
+        }
+      } catch {}
+    }
+
+    // 2. Check general cache
     try {
-      const raw = localStorage.getItem('ats_demo_user_session');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.user) {
-          currentEmail = parsed.user.email || '';
-          currentName = parsed.user.user_metadata?.full_name || parsed.user.email?.split('@')[0] || '';
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.email && (!email || parsed.email.toLowerCase() === email)) {
+          return parsed;
         }
       }
     } catch {}
 
     const fallbackProfile: Profile = {
       user_id: 'current-user',
-      full_name: currentName || 'Candidate',
-      email: currentEmail || '',
+      full_name: current.name || 'Candidate',
+      email: current.email || '',
       phone: '',
       location: '',
       linkedin: '',
@@ -189,28 +236,19 @@ export const api = {
     };
 
     try {
-      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-      if (cached) {
-        const parsed: Profile = JSON.parse(cached);
-        // Ensure email matches currently signed-in user
-        if (currentEmail && parsed.email !== currentEmail) {
-          parsed.email = currentEmail;
-          parsed.full_name = currentName || parsed.full_name;
-          localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-    } catch {}
-
-    try {
       const p = await request<Profile>('/api/profile');
       if (p) {
-        if (currentEmail && p.email !== currentEmail) {
-          p.email = currentEmail;
-          p.full_name = currentName || p.full_name;
-        }
-        try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)); } catch {}
-        return p;
+        const resolved: Profile = {
+          ...fallbackProfile,
+          ...p,
+          email: email || p.email,
+          full_name: (p.full_name && !p.full_name.includes('Demo Candidate')) ? p.full_name : (current.name || p.full_name),
+        };
+        try {
+          if (email) localStorage.setItem(`ats_profile_${email}`, JSON.stringify(resolved));
+          localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(resolved));
+        } catch {}
+        return resolved;
       }
       return fallbackProfile;
     } catch {
@@ -219,16 +257,52 @@ export const api = {
   },
 
   saveProfile: async (p: Partial<Profile>): Promise<Profile> => {
+    const current = getCurrentUserInfo();
+    const email = (p.email || current.email || '').toLowerCase().trim();
+    const prev = await api.getProfile();
+
+    const updated: Profile = {
+      ...prev,
+      ...p,
+      email: email || prev.email,
+      full_name: p.full_name || prev.full_name,
+      target_role: p.target_role || prev.target_role,
+      career_level: p.career_level || prev.career_level,
+    };
+
     try {
-      const prev = await api.getProfile();
-      const updated = { ...prev, ...p };
+      if (email) {
+        localStorage.setItem(`ats_profile_${email}`, JSON.stringify(updated));
+      }
       localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updated));
     } catch {}
 
     try {
-      return await request<Profile>('/api/profile', { method: 'PUT', body: JSON.stringify(p) });
+      const remote = await request<Profile>('/api/profile', {
+        method: 'PUT',
+        body: JSON.stringify(updated),
+      });
+      if (remote) {
+        const merged: Profile = {
+          ...updated,
+          ...remote,
+          email: email || remote.email,
+          full_name: (updated.full_name && !updated.full_name.includes('Demo Candidate')) ? updated.full_name : remote.full_name,
+          target_role: updated.target_role || remote.target_role,
+          career_level: updated.career_level || remote.career_level,
+          phone: updated.phone ?? remote.phone,
+          location: updated.location ?? remote.location,
+          linkedin: updated.linkedin ?? remote.linkedin,
+        };
+        if (email) {
+          localStorage.setItem(`ats_profile_${email}`, JSON.stringify(merged));
+        }
+        localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+        return merged;
+      }
+      return updated;
     } catch {
-      return (await api.getProfile());
+      return updated;
     }
   },
 

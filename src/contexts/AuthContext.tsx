@@ -32,11 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const signInWithGoogleProfile = (profile: GoogleUserProfile) => {
+    const userEmail = profile.email.toLowerCase().trim();
+
+    // Check if user has previously saved profile details for this email
+    let existingProfile: Partial<Profile> = {};
+    try {
+      const stored = localStorage.getItem(`ats_profile_${userEmail}`);
+      if (stored) existingProfile = JSON.parse(stored);
+    } catch {}
+
+    const resolvedName = existingProfile.full_name || profile.name;
+
     const googleUser = {
       id: profile.id,
       email: profile.email,
       user_metadata: {
-        full_name: profile.name,
+        full_name: resolvedName,
         avatar_url: profile.picture,
         provider: 'google',
       },
@@ -53,20 +64,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: googleUser,
     } as unknown as import('@supabase/supabase-js').Session;
 
-    // Immediately create / update the profile settings for this Google user
     const updatedProfile: Profile = {
       user_id: profile.id,
-      full_name: profile.name,
+      full_name: resolvedName,
       email: profile.email,
-      phone: '',
-      location: '',
-      linkedin: '',
-      target_role: 'software_engineer',
-      career_level: 'fresher',
+      phone: existingProfile.phone || '',
+      location: existingProfile.location || '',
+      linkedin: existingProfile.linkedin || '',
+      target_role: existingProfile.target_role || 'software_engineer',
+      career_level: existingProfile.career_level || 'fresher',
+      ...existingProfile,
     };
 
     try {
       localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(googleSession));
+      localStorage.setItem(`ats_profile_${userEmail}`, JSON.stringify(updatedProfile));
       localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updatedProfile));
     } catch {}
 
@@ -76,7 +88,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInLocally = (email: string, name?: string, provider = 'email') => {
-    const resolvedName = name || email.split('@')[0];
+    const userEmail = email.toLowerCase().trim();
+
+    let existingProfile: Partial<Profile> = {};
+    try {
+      const stored = localStorage.getItem(`ats_profile_${userEmail}`);
+      if (stored) existingProfile = JSON.parse(stored);
+    } catch {}
+
+    const resolvedName = existingProfile.full_name || name || email.split('@')[0];
+
     const localUser = {
       id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       email,
@@ -98,15 +119,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user_id: localUser.id,
       full_name: resolvedName,
       email,
-      phone: '',
-      location: '',
-      linkedin: '',
-      target_role: 'software_engineer',
-      career_level: 'fresher',
+      phone: existingProfile.phone || '',
+      location: existingProfile.location || '',
+      linkedin: existingProfile.linkedin || '',
+      target_role: existingProfile.target_role || 'software_engineer',
+      career_level: existingProfile.career_level || 'fresher',
+      ...existingProfile,
     };
 
     try {
       localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(localSession));
+      localStorage.setItem(`ats_profile_${userEmail}`, JSON.stringify(updatedProfile));
       localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updatedProfile));
     } catch {}
 
@@ -138,6 +161,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.user) {
+          const userEmail = (parsed.user.email || '').toLowerCase().trim();
+          if (userEmail) {
+            try {
+              const savedProf = localStorage.getItem(`ats_profile_${userEmail}`);
+              if (savedProf) {
+                const p = JSON.parse(savedProf);
+                if (p?.full_name && !p.full_name.includes('Demo Candidate')) {
+                  parsed.user.user_metadata = {
+                    ...parsed.user.user_metadata,
+                    full_name: p.full_name,
+                  };
+                }
+              }
+            } catch {}
+          }
           setUser(parsed.user);
           setSession(parsed);
           setLoading(false);
