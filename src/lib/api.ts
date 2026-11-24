@@ -164,10 +164,23 @@ export const api = {
   },
 
   getProfile: async (): Promise<Profile> => {
+    let currentEmail = '';
+    let currentName = '';
+    try {
+      const raw = localStorage.getItem('ats_demo_user_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.user) {
+          currentEmail = parsed.user.email || '';
+          currentName = parsed.user.user_metadata?.full_name || parsed.user.email?.split('@')[0] || '';
+        }
+      }
+    } catch {}
+
     const fallbackProfile: Profile = {
       user_id: 'current-user',
-      full_name: 'Demo Candidate',
-      email: 'demo@atsresume.app',
+      full_name: currentName || 'Candidate',
+      email: currentEmail || '',
       phone: '',
       location: '',
       linkedin: '',
@@ -177,12 +190,25 @@ export const api = {
 
     try {
       const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed: Profile = JSON.parse(cached);
+        // Ensure email matches currently signed-in user
+        if (currentEmail && parsed.email !== currentEmail) {
+          parsed.email = currentEmail;
+          parsed.full_name = currentName || parsed.full_name;
+          localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch {}
 
     try {
       const p = await request<Profile>('/api/profile');
       if (p) {
+        if (currentEmail && p.email !== currentEmail) {
+          p.email = currentEmail;
+          p.full_name = currentName || p.full_name;
+        }
         try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)); } catch {}
         return p;
       }

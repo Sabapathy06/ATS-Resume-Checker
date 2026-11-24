@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import supabase from '../lib/supabase';
 import type { GoogleUserProfile } from '../lib/googleAuth';
+import type { Profile } from '../types';
 
 interface AuthContextValue {
   user: import('@supabase/supabase-js').Session['user'] | null;
@@ -13,6 +14,7 @@ interface AuthContextValue {
 }
 
 const LOCAL_USER_STORAGE_KEY = 'ats_demo_user_session';
+const PROFILE_CACHE_KEY = 'ats_profile_cache';
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
@@ -51,8 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: googleUser,
     } as unknown as import('@supabase/supabase-js').Session;
 
+    // Immediately create / update the profile settings for this Google user
+    const updatedProfile: Profile = {
+      user_id: profile.id,
+      full_name: profile.name,
+      email: profile.email,
+      phone: '',
+      location: '',
+      linkedin: '',
+      target_role: 'software_engineer',
+      career_level: 'fresher',
+    };
+
     try {
       localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(googleSession));
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updatedProfile));
     } catch {}
 
     setUser(googleUser);
@@ -61,10 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInLocally = (email: string, name?: string, provider = 'email') => {
+    const resolvedName = name || email.split('@')[0];
     const localUser = {
       id: `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       email,
-      user_metadata: { full_name: name || email.split('@')[0], provider },
+      user_metadata: { full_name: resolvedName, provider },
       app_metadata: { provider },
       aud: 'authenticated',
       created_at: new Date().toISOString(),
@@ -78,8 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: localUser,
     } as unknown as import('@supabase/supabase-js').Session;
 
+    const updatedProfile: Profile = {
+      user_id: localUser.id,
+      full_name: resolvedName,
+      email,
+      phone: '',
+      location: '',
+      linkedin: '',
+      target_role: 'software_engineer',
+      career_level: 'fresher',
+    };
+
     try {
       localStorage.setItem(LOCAL_USER_STORAGE_KEY, JSON.stringify(localSession));
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updatedProfile));
     } catch {}
 
     setUser(localUser);
@@ -94,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       localStorage.removeItem(LOCAL_USER_STORAGE_KEY);
+      localStorage.removeItem(PROFILE_CACHE_KEY);
     } catch {}
     try {
       await supabase.auth.signOut();

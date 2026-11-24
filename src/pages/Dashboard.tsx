@@ -25,7 +25,15 @@ export default function Dashboard() {
 
   const load = () => {
     Promise.all([api.listAnalyses(), api.getProfile()])
-      .then(([list, p]) => { setItems(list); setProfile(p); })
+      .then(([list, p]) => {
+        setItems(list);
+        const resolvedProfile: Profile = {
+          ...p,
+          email: user?.email || p.email,
+          full_name: (p.full_name && !p.full_name.includes('Demo Candidate')) ? p.full_name : (user?.user_metadata?.full_name || user?.email?.split('@')[0] || p.full_name),
+        };
+        setProfile(resolvedProfile);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load your dashboard.'))
       .finally(() => setLoading(false));
   };
@@ -243,11 +251,11 @@ export default function Dashboard() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {([
-                  { key: 'full_name', label: 'Full name', placeholder: 'Priya Mehta' },
+                  { key: 'full_name', label: 'Full name', placeholder: 'e.g. Sabapathy S S' },
                   { key: 'email', label: 'Email', placeholder: 'you@example.com' },
-                  { key: 'phone', label: 'Phone', placeholder: '+91 98765 43210' },
-                  { key: 'location', label: 'Location', placeholder: 'Bengaluru, India' },
-                  { key: 'linkedin', label: 'LinkedIn URL', placeholder: 'linkedin.com/in/you' },
+                  { key: 'phone', label: 'Phone', placeholder: 'e.g. +91 98765 43210' },
+                  { key: 'location', label: 'Location', placeholder: 'e.g. Chennai, India' },
+                  { key: 'linkedin', label: 'LinkedIn URL', placeholder: 'e.g. linkedin.com/in/yourprofile' },
                 ] as const).map((f) => (
                   <div key={f.key}>
                     <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">{f.label}</label>

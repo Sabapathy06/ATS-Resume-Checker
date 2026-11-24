@@ -10,8 +10,11 @@ export default async function handler(req, res) {
 
   const defaultProfile = {
     user_id: auth.user.id,
-    full_name: auth.user.user_metadata?.full_name || auth.user.email?.split('@')[0] || 'Demo Candidate',
-    email: auth.user.email || 'demo@atsresume.app',
+    full_name: auth.user.user_metadata?.full_name || auth.user.email?.split('@')[0] || '',
+    email: auth.user.email || '',
+    phone: '',
+    location: '',
+    linkedin: '',
     target_role: 'software_engineer',
     career_level: 'fresher',
   };
